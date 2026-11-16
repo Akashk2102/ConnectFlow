@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # General App Config
     APP_NAME: str = "ConnectFlow"
-    APP_ENV: Literal["development", "staging", "production"] = "development"
+    APP_ENV: Literal["development", "staging", "production", "testing"] = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
     SECRET_KEY: str = "default_insecure_key_for_dev_only_change_in_production"
@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
     HOST: str = "0.0.0.0"
 
-    # Database Settings (Stage 3)
+    # Database Settings
+    DATABASE_URL: Optional[str] = None
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
@@ -36,7 +37,12 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        """Computes the async PostgreSQL connection string."""
+        """
+        Computes the async database connection string.
+        Prioritizes explicit DATABASE_URL if provided, else constructs PostgreSQL URI.
+        """
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
             f"{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -58,8 +64,5 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """
-    Returns a cached instance of the settings.
-    Ensures settings are only read and validated from disk/env once.
-    """
+    """Returns a cached instance of the settings."""
     return Settings()
