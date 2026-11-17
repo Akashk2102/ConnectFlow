@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from app.core.config import get_settings
 from app.api.v1.router import api_router
+from app.api.v1.dashboard import serve_dashboard
 
 settings = get_settings()
 
@@ -13,11 +15,9 @@ async def lifespan(app: FastAPI):
     FastAPI Lifespan Context Manager.
     Runs startup logic before yielding, and cleanup logic on shutdown.
     """
-    # Startup: Initialize connection pools, verify configurations
-    print(f"🚀 Starting {settings.APP_NAME} in [{settings.APP_ENV}] mode...")
+    print(f"Starting {settings.APP_NAME} in [{settings.APP_ENV}] mode...")
     yield
-    # Shutdown: Cleanly close DB connections, Redis pools, active workers
-    print(f"🛑 Gracefully shutting down {settings.APP_NAME}...")
+    print(f"Gracefully shutting down {settings.APP_NAME}...")
 
 
 app = FastAPI(
@@ -39,8 +39,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API routers
+# Mount API routers under /api/v1
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+# Top-level direct dashboard route
+@app.get("/dashboard", include_in_schema=False)
+async def root_dashboard():
+    return await serve_dashboard()
 
 
 @app.get("/", tags=["Root"])
@@ -48,6 +54,7 @@ async def root():
     return {
         "message": f"Welcome to {settings.APP_NAME} API",
         "documentation": "/docs",
+        "dashboard": "/dashboard",
         "api_v1": settings.API_V1_PREFIX,
         "health_check": f"{settings.API_V1_PREFIX}/health"
     }
