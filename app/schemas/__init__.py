@@ -15,6 +15,12 @@ from app.schemas.webhook import (
     DeliveryReportWebhook,
     WebhookAckResponse,
 )
+from app.schemas.ai import (
+    IntentCategory,
+    Sentiment,
+    Urgency,
+    LLMClassificationResult,
+)
 
 __all__ = [
     "HealthResponse",
@@ -28,4 +34,8 @@ __all__ = [
     "InboundMessageWebhook",
     "DeliveryReportWebhook",
     "WebhookAckResponse",
+    "IntentCategory",
+    "Sentiment",
+    "Urgency",
+    "LLMClassificationResult",
 ]
