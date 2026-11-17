@@ -21,6 +21,11 @@ from app.schemas.ai import (
     Urgency,
     LLMClassificationResult,
 )
+from app.schemas.workflow import (
+    WorkflowActionResponse,
+    ApproveActionRequest,
+    RejectActionRequest,
+)
 
 __all__ = [
     "HealthResponse",
@@ -38,4 +43,7 @@ __all__ = [
     "Sentiment",
     "Urgency",
     "LLMClassificationResult",
+    "WorkflowActionResponse",
+    "ApproveActionRequest",
+    "RejectActionRequest",
 ]
