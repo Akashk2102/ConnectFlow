@@ -10,6 +10,11 @@ from app.schemas.message import (
     ConversationResponse,
     ConversationDetailResponse,
 )
+from app.schemas.webhook import (
+    InboundMessageWebhook,
+    DeliveryReportWebhook,
+    WebhookAckResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -20,4 +25,7 @@ __all__ = [
     "MessageResponse",
     "ConversationResponse",
     "ConversationDetailResponse",
+    "InboundMessageWebhook",
+    "DeliveryReportWebhook",
+    "WebhookAckResponse",
 ]
