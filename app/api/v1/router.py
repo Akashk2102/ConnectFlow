@@ -4,6 +4,7 @@ from app.api.v1.customers import router as customers_router
 from app.api.v1.messages import router as messages_router
 from app.api.v1.webhooks import router as webhooks_router
 from app.api.v1.workflow import router as workflow_router
+from app.api.v1.metrics import router as metrics_router
 
 api_router = APIRouter()
 
@@ -13,3 +14,4 @@ api_router.include_router(customers_router)
 api_router.include_router(messages_router)
 api_router.include_router(webhooks_router)
 api_router.include_router(workflow_router)
+api_router.include_router(metrics_router)
