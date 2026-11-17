@@ -20,7 +20,7 @@ async def test_send_message_and_transcript_flow(
     assert send_res.status_code == 201
     msg1 = send_res.json()
     assert msg1["direction"] == "outbound"
-    assert msg1["status"] == "sent"
+    assert msg1["status"] in ("queued", "sent")
     conv_id = msg1["conversation_id"]
 
     # 2. Send follow-up message to the same recipient (should thread into the same conversation)

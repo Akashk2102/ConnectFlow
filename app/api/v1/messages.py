@@ -17,6 +17,7 @@ from app.schemas.message import (
     MessageCreate,
     MessageResponse,
 )
+from app.services.messaging import MessagingClient, get_messaging_client
 
 router = APIRouter(tags=["Messaging & Conversations"])
 settings = get_settings()
@@ -27,11 +28,12 @@ settings = get_settings()
     response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Send outbound message to customer",
-    description="Queues and sends an outbound SMS/WhatsApp message to a customer.",
+    description="Dispatches an outbound SMS/WhatsApp message via the configured messaging provider (Plivo/Mock).",
 )
 async def send_message(
     payload: MessageCreate,
     business: BusinessAccount = Depends(get_current_business),
+    messaging_client: MessagingClient = Depends(get_messaging_client),
     db: AsyncSession = Depends(get_db),
 ) -> MessageResponse:
     # 1. Resolve or create customer under this business
@@ -65,12 +67,15 @@ async def send_message(
                 detail="Specified conversation_id not found for this customer.",
             )
     else:
-        # Check for open active conversation on this channel
-        conv_stmt = select(Conversation).where(
-            Conversation.customer_id == customer.id,
-            Conversation.channel == payload.channel,
-            Conversation.status == "active",
-        ).order_by(Conversation.updated_at.desc())
+        conv_stmt = (
+            select(Conversation)
+            .where(
+                Conversation.customer_id == customer.id,
+                Conversation.channel == payload.channel,
+                Conversation.status == "active",
+            )
+            .order_by(Conversation.updated_at.desc())
+        )
         conv_res = await db.execute(conv_stmt)
         conversation = conv_res.scalars().first()
 
@@ -83,18 +88,30 @@ async def send_message(
             db.add(conversation)
             await db.flush()
 
-    # 3. Create outbound message record
-    # Sender is configured business phone number
+    # 3. Dispatch to Telecom Provider Adapter (Plivo or Mock)
     sender_number = settings.PLIVO_PHONE_NUMBER or "+18005550199"
+    delivery_result = await messaging_client.send_message(
+        recipient=customer.phone_number,
+        content=payload.content,
+        sender=sender_number,
+    )
 
+    provider_msg_id = (
+        delivery_result.message_uuids[0]
+        if delivery_result.message_uuids
+        else f"local_{uuid.uuid4().hex[:16]}"
+    )
+    msg_status = delivery_result.status if delivery_result.success else "failed"
+
+    # 4. Save outbound message record
     message = Message(
         conversation_id=conversation.id,
         direction="outbound",
         sender=sender_number,
         recipient=customer.phone_number,
         content=payload.content,
-        provider_message_id=f"outbound_{uuid.uuid4().hex[:16]}",
-        status="sent",
+        provider_message_id=provider_msg_id,
+        status=msg_status,
     )
     db.add(message)
     await db.commit()
