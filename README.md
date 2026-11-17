@@ -172,4 +172,3 @@ tests/test_dashboard.py            [Pass]
 - [REST API Reference](docs/API_DOCUMENTATION.md)
 - [Telecom & LLM Integration Guide](docs/INTEGRATION_GUIDE.md)
 - [Production Troubleshooting Guide](docs/TROUBLESHOOTING.md)
-- [Technical Interview Preparation](docs/INTERVIEW_QUESTIONS.md)
