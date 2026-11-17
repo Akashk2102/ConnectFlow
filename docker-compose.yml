@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: connectflow_api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=ConnectFlow
+      - APP_ENV=production
+      - DEBUG=False
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=connectflow
+      - POSTGRES_PASSWORD=connectflow_secure_password
+      - POSTGRES_DB=connectflow_db
+      - REDIS_URL=redis://redis:6379/0
+      - PLIVO_AUTH_ID=${PLIVO_AUTH_ID:-mock_auth_id}
+      - PLIVO_AUTH_TOKEN=${PLIVO_AUTH_TOKEN:-mock_auth_token}
+      - PLIVO_PHONE_NUMBER=${PLIVO_PHONE_NUMBER:-+18005550199}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_API_KEY=${LLM_API_KEY:-mock_key}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: connectflow_postgres
+    environment:
+      POSTGRES_USER: connectflow
+      POSTGRES_PASSWORD: connectflow_secure_password
+      POSTGRES_DB: connectflow_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U connectflow -d connectflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: connectflow_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
