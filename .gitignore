@@ -21,6 +21,11 @@ htmlcov/
 *.swp
 *.swo
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # OS files
 Thumbs.db
 ehthumbs.db

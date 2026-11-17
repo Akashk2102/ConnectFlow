@@ -82,7 +82,7 @@ flowchart TD
 
 ### 2. Clone and Setup Environment
 ```bash
-git clone https://github.com/your-org/connectflow.git
+git clone https://github.com/Akashk2102/ConnectFlow.git
 cd connectflow
 
 # Create and activate virtual environment
