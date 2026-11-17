@@ -8,9 +8,14 @@ from app.db.session import get_db
 from app.models.business_account import BusinessAccount
 from app.models.conversation import Conversation
 from app.models.customer import Customer
+from app.models.message import Message
 from app.models.workflow_action import WorkflowAction
+from app.schemas.message import MessageResponse
 from app.schemas.workflow import ApproveActionRequest, RejectActionRequest, WorkflowActionResponse
+from app.services.ai import get_llm_client
+from app.services.messaging import get_messaging_client
 from app.services.tools.executor import approve_workflow_action, reject_workflow_action, tool_registry
+from app.services.workflow_orchestrator import WorkflowOrchestrator
 
 router = APIRouter(prefix="/workflow", tags=["Workflow & Human Approvals"])
 
@@ -63,7 +68,6 @@ async def approve_action(
     business: BusinessAccount = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowActionResponse:
-    # Verify action belongs to this business
     stmt = (
         select(WorkflowAction)
         .join(Conversation, WorkflowAction.conversation_id == Conversation.id)
@@ -133,3 +137,36 @@ async def reject_action(
         return WorkflowActionResponse.model_validate(updated_action)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post(
+    "/process-message/{message_id}",
+    response_model=MessageResponse,
+    summary="Execute or replay full orchestration on a message",
+)
+async def process_message_orchestration(
+    message_id: uuid.UUID,
+    business: BusinessAccount = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    llm = Depends(get_llm_client),
+    messaging = Depends(get_messaging_client),
+) -> MessageResponse:
+    # Verify message ownership
+    stmt = (
+        select(Message)
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .join(Customer, Conversation.customer_id == Customer.id)
+        .where(
+            Message.id == message_id,
+            Customer.business_id == business.id,
+        )
+    )
+    res = await db.execute(stmt)
+    if not res.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Message not found.")
+
+    orchestrator = WorkflowOrchestrator(db=db, llm_client=llm, messaging_client=messaging)
+    outbound = await orchestrator.process_inbound_message(message_id)
+    if not outbound:
+        raise HTTPException(status_code=500, detail="Failed to process orchestration.")
+    return MessageResponse.model_validate(outbound)

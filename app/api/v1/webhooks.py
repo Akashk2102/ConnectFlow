@@ -1,3 +1,4 @@
+import logging
 import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
@@ -10,30 +11,33 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.schemas.webhook import DeliveryReportWebhook, InboundMessageWebhook, WebhookAckResponse
 from app.services.ai import get_llm_client
-from app.services.ai.classifier import classify_and_persist_message
+from app.services.messaging import get_messaging_client
 from app.services.webhook_verifier import WebhookSignatureVerifier
+from app.services.workflow_orchestrator import WorkflowOrchestrator
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["Webhooks & Ingress"])
 
 
 async def process_inbound_message_background(message_id_str: str):
     """
-    Background worker that classifies message intent and extracts entities.
-    Runs asynchronously without blocking the webhook acknowledgment.
+    Background worker orchestrating the full autonomous communication cycle:
+    Inbound -> Intent -> Tool -> Outbound reply.
     """
     try:
         message_id = uuid.UUID(message_id_str)
         async with async_session_factory() as session:
             settings = get_settings()
             llm_client = get_llm_client(settings)
-            await classify_and_persist_message(
-                message_id=message_id,
+            messaging_client = get_messaging_client(settings)
+            orchestrator = WorkflowOrchestrator(
                 db=session,
                 llm_client=llm_client,
+                messaging_client=messaging_client,
             )
+            await orchestrator.process_inbound_message(message_id)
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error(f"Error in background AI worker: {exc}")
+        logger.error(f"Error in background workflow orchestrator: {exc}", exc_info=True)
 
 
 @router.post(
@@ -41,7 +45,7 @@ async def process_inbound_message_background(message_id_str: str):
     response_model=WebhookAckResponse,
     status_code=status.HTTP_200_OK,
     summary="Receive Inbound Message Webhook",
-    description="Processes incoming SMS/WhatsApp messages with signature verification and idempotency.",
+    description="Processes incoming SMS/WhatsApp messages with signature verification, idempotency, and AI orchestration.",
 )
 async def handle_inbound_message(
     payload: InboundMessageWebhook,
@@ -151,7 +155,7 @@ async def handle_inbound_message(
     await db.commit()
     await db.refresh(message)
 
-    # 7. Asynchronous Task Dispatch for AI Processing
+    # 7. Asynchronous Task Dispatch for End-to-End Workflow Orchestration
     background_tasks.add_task(process_inbound_message_background, str(message.id))
 
     return WebhookAckResponse(
